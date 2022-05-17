@@ -74,7 +74,7 @@ evaluation_params:
 net_params:
   # random_state: 12
   batch_size: 50
-  max_epochs: 2
+  max_epochs: 1500
   lr: 0.001  # this is actually the maximal learning rate of the OneCycle LR scheduler.
   module:
     final_conv_length: auto
