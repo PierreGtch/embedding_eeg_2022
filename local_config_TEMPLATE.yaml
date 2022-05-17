@@ -1,0 +1,12 @@
+# copy this file to 'local_config.yaml' and put your own parameters
+evaluation_params:
+  base:
+    n_jobs: 1
+    overwrite: true
+    error_score: 'raise'
+    suffix: ''
+    hdf5_path: null
+net_params:
+  num_workers: 0
+  pin_memory: False
+  device: 'cpu'

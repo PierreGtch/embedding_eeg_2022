@@ -1,0 +1,19 @@
+name: embedding_eeg_2022
+channels:
+- default
+dependencies:
+- python>=3.6
+- ipython
+- pip
+- numpy
+- matplotlib
+- seaborn
+- pandas
+- scikit-learn
+- h5py
+- tqdm
+- pytorch
+- skorch
+- pip:
+  - mne
+  - moabb
