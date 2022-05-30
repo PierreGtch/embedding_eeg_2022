@@ -1,2 +1,8 @@
-local_config.yaml
+# IDE
+.idea
+
+# python
 __pycache__
+
+# other
+local_config.yaml
