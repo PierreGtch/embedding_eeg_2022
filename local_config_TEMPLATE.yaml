@@ -6,8 +6,4 @@ evaluation_params:
     error_score: 'raise'
     suffix: ''
     hdf5_path: null
-net_params:
-  device: 'cpu'
-  iterator_train:
-    num_workers: 0
-    pin_memory: False
+

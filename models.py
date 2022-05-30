@@ -3,7 +3,8 @@ Implementation obtained from braindecode
 '''
 import torch
 from torch import nn
-from torch.nn.functional import elu
+import torch.nn.functional as F
+import pytorch_lightning as pl
 
 
 ################################################################
@@ -54,7 +55,7 @@ def transpose_time_to_spat(x):
 
 class Ensure4d(torch.nn.Module):
     def forward(self, x):
-        while (len(x.shape) < 4):
+        while len(x.shape) < 4:
             x = x.unsqueeze(-1)
         return x
 
@@ -109,31 +110,10 @@ class Conv2dWithConstraint(nn.Conv2d):
 # models
 ################################################################
 
-class EEGNetv4(nn.Sequential):
-    """
-    EEGNet v4 model from [EEGNet4]_.
-
-    Notes
-    -----
-    This implementation is not guaranteed to be correct, has not been checked
-    by original authors, only reimplemented from the paper description.
-
-    References
-    ----------
-
-    .. [EEGNet4] Lawhern, V. J., Solon, A. J., Waytowich, N. R., Gordon,
-       S. M., Hung, C. P., & Lance, B. J. (2018).
-       EEGNet: A Compact Convolutional Network for EEG-based
-       Brain-Computer Interfaces.
-       arXiv preprint arXiv:1611.08024.
-    """
-
+class _EEGNetv4Embedding(nn.Sequential):
     def __init__(
             self,
             in_chans,
-            n_classes,
-            input_window_samples=None,
-            final_conv_length="auto",
             pool_mode="mean",
             F1=8,
             D=2,
@@ -143,12 +123,7 @@ class EEGNetv4(nn.Sequential):
             drop_prob=0.25,
     ):
         super().__init__()
-        if final_conv_length == "auto":
-            assert input_window_samples is not None
         self.in_chans = in_chans
-        self.n_classes = n_classes
-        self.input_window_samples = input_window_samples
-        self.final_conv_length = final_conv_length
         self.pool_mode = pool_mode
         self.F1 = F1
         self.D = D
@@ -198,7 +173,7 @@ class EEGNetv4(nn.Sequential):
                 self.F1 * self.D, momentum=0.01, affine=True, eps=1e-3
             ),
         )
-        self.add_module("elu_1", Expression(elu))
+        self.add_module("elu_1", Expression(F.elu))
 
         self.add_module("pool_1", pool_class(kernel_size=(1, 4), stride=(1, 4)))
         self.add_module("drop_1", nn.Dropout(p=self.drop_prob))
@@ -232,38 +207,107 @@ class EEGNetv4(nn.Sequential):
             "bnorm_2",
             nn.BatchNorm2d(self.F2, momentum=0.01, affine=True, eps=1e-3),
         )
-        self.add_module("elu_2", Expression(elu))
+        self.add_module("elu_2", Expression(F.elu))
         self.add_module("pool_2", pool_class(kernel_size=(1, 8), stride=(1, 8)))
         self.add_module("drop_2", nn.Dropout(p=self.drop_prob))
+        self.add_module('flatten', nn.Flatten())
 
-        out = self(
+        _glorot_weight_zero_bias(self)
+
+
+class EEGNetv4(pl.LightningModule):
+    """
+    EEGNet v4 model from [EEGNet4]_.
+
+    Notes
+    -----
+    This implementation is not guaranteed to be correct, has not been checked
+    by original authors, only reimplemented from the paper description.
+
+    References
+    ----------
+
+    .. [EEGNet4] Lawhern, V. J., Solon, A. J., Waytowich, N. R., Gordon,
+       S. M., Hung, C. P., & Lance, B. J. (2018).
+       EEGNet: A Compact Convolutional Network for EEG-based
+       Brain-Computer Interfaces.
+       arXiv preprint arXiv:1611.08024.
+    """
+
+    def __init__(
+            self,
+            in_chans,
+            n_classes,
+            input_window_samples,
+            pool_mode="mean",
+            F1=8,
+            D=2,
+            F2=16,  # usually set to F1*D (?)
+            kernel_length=64,
+            third_kernel_size=(8, 4),
+            drop_prob=0.25,
+            lr=0.001,
+            max_lr=0.1,
+    ):
+        super().__init__()
+        self.in_chans = in_chans
+        self.n_classes = n_classes
+        self.input_window_samples = input_window_samples
+        self.pool_mode = pool_mode
+        self.F1 = F1
+        self.D = D
+        self.F2 = F2
+        self.kernel_length = kernel_length
+        self.third_kernel_size = third_kernel_size
+        self.drop_prob = drop_prob
+        self.lr = lr
+        self.max_lr = max_lr
+
+        self.embedding = _EEGNetv4Embedding(
+            in_chans=self.in_chans,
+            pool_mode=self.pool_mode,
+            F1=self.F1,
+            D=self.D,
+            F2=self.F2,
+            kernel_length=self.kernel_length,
+            third_kernel_size=self.third_kernel_size,
+            drop_prob=self.drop_prob,
+        )
+
+        out = self.embedding(
             torch.ones(
                 (1, self.in_chans, self.input_window_samples, 1),
                 dtype=torch.float32
             )
         )
-        n_out_virtual_chans = out.cpu().data.numpy().shape[2]
+        self.embedding_size = out.cpu().data.numpy().shape[1]
 
-        if self.final_conv_length == "auto":
-            n_out_time = out.cpu().data.numpy().shape[3]
-            self.final_conv_length = n_out_time
+        self.classifier = nn.Linear(self.embedding_size, self.n_classes)
 
-        self.add_module(
-            "conv_classifier",
-            nn.Conv2d(
-                self.F2,
-                self.n_classes,
-                (n_out_virtual_chans, self.final_conv_length),
-                bias=True,
-            ),
+    def forward(self, x):
+        return self.classifier(self.embedding(x))
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = F.cross_entropy(y_hat, y)
+        self.log("train_loss", loss, on_epoch=True)
+        return loss
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)
+        lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=self.max_lr,
+            total_steps=self.trainer.estimated_stepping_batches
         )
-        # self.add_module("softmax", nn.LogSoftmax(dim=1))
-        # Transpose back to the the logic of braindecode,
-        # so time in third dimension (axis=2)
-        self.add_module("permute_back", Expression(_transpose_1_0))
-        self.add_module("squeeze", Expression(squeeze_final_output))
-
-        _glorot_weight_zero_bias(self)
+        return dict(
+            optimizer=optimizer,
+            lr_scheduler=dict(
+                scheduler=lr_scheduler,
+                interval='step',
+            )
+        )
 
 
 def _transpose_to_b_1_c_0(x):
