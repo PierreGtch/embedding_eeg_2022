@@ -13,9 +13,11 @@ from torch.nn.functional import elu
 def square(x):
     return x * x
 
+
 def safe_log(x, eps=1e-6):
     """ Prevents :math:`log(0)` by using :math:`log(max(x, eps))`."""
     return torch.log(torch.clamp(x, min=eps))
+
 
 def squeeze_final_output(x):
     """Removes empty dimension at end and potentially removes empty time
@@ -34,6 +36,7 @@ def squeeze_final_output(x):
         x = x[:, :, 0]
     return x
 
+
 def transpose_time_to_spat(x):
     """Swap time and spatial dimensions.
 
@@ -51,9 +54,10 @@ def transpose_time_to_spat(x):
 
 class Ensure4d(torch.nn.Module):
     def forward(self, x):
-        while(len(x.shape) < 4):
+        while (len(x.shape) < 4):
             x = x.unsqueeze(-1)
         return x
+
 
 class Expression(torch.nn.Module):
     """Compute given expression on forward pass.
@@ -74,7 +78,7 @@ class Expression(torch.nn.Module):
 
     def __repr__(self):
         if hasattr(self.expression_fn, "func") and hasattr(
-            self.expression_fn, "kwargs"
+                self.expression_fn, "kwargs"
         ):
             expression_str = "{:s} {:s}".format(
                 self.expression_fn.func.__name__, str(self.expression_fn.kwargs)
@@ -84,9 +88,10 @@ class Expression(torch.nn.Module):
         else:
             expression_str = repr(self.expression_fn)
         return (
-            self.__class__.__name__ +
-            "(expression=%s) " % expression_str
+                self.__class__.__name__ +
+                "(expression=%s) " % expression_str
         )
+
 
 class Conv2dWithConstraint(nn.Conv2d):
     def __init__(self, *args, max_norm=1, **kwargs):
@@ -124,18 +129,18 @@ class EEGNetv4(nn.Sequential):
     """
 
     def __init__(
-        self,
-        in_chans,
-        n_classes,
-        input_window_samples=None,
-        final_conv_length="auto",
-        pool_mode="mean",
-        F1=8,
-        D=2,
-        F2=16,  # usually set to F1*D (?)
-        kernel_length=64,
-        third_kernel_size=(8, 4),
-        drop_prob=0.25,
+            self,
+            in_chans,
+            n_classes,
+            input_window_samples=None,
+            final_conv_length="auto",
+            pool_mode="mean",
+            F1=8,
+            D=2,
+            F2=16,  # usually set to F1*D (?)
+            kernel_length=64,
+            third_kernel_size=(8, 4),
+            drop_prob=0.25,
     ):
         super().__init__()
         if final_conv_length == "auto":
@@ -252,7 +257,7 @@ class EEGNetv4(nn.Sequential):
                 bias=True,
             ),
         )
-        #self.add_module("softmax", nn.LogSoftmax(dim=1))
+        # self.add_module("softmax", nn.LogSoftmax(dim=1))
         # Transpose back to the the logic of braindecode,
         # so time in third dimension (axis=2)
         self.add_module("permute_back", Expression(_transpose_1_0))

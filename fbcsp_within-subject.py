@@ -17,7 +17,7 @@ from moabb.pipelines.utils import FilterBank
 moabb.set_log_level("info")
 
 # Load condig
-config_file       = Path(__file__).parent /       'config.yaml'
+config_file = Path(__file__).parent / 'config.yaml'
 local_config_file = Path(__file__).parent / 'local_config.yaml'
 with config_file.open('r') as f:
     config = yaml.safe_load(f)
