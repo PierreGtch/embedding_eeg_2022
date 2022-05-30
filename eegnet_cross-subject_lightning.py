@@ -93,6 +93,6 @@ def main(subject, ckpt_path):
 
 
 results = Parallel(n_jobs=args.n_jobs)(
-    delayed(main)(subject, ckpt_path) for subject, ckpt_path in zip(args.sbjects, checkpoint_dir_list)
+    delayed(main)(subject, ckpt_path) for subject, ckpt_path in zip(args.subjects, checkpoint_dir_list)
 )
 print(results)
