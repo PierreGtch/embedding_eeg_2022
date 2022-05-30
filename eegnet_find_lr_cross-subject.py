@@ -65,4 +65,5 @@ trainer = pl.Trainer(max_epochs=config['net_params']['max_epochs'], devices=devi
                      auto_lr_find=True)
 lr_finder = trainer.tuner.lr_find(model, datamodule=datamodule)
 fig = lr_finder.plot(suggest=True)
+fig.savefig('lr_finder.pdf')
 fig.show()
