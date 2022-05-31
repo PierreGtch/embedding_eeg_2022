@@ -5,6 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
+import torchmetrics
 
 
 ################################################################
@@ -270,8 +271,8 @@ class EEGNetv4(pl.LightningModule):
             )
         )
         self.embedding_size = out.cpu().data.numpy().shape[1]
-
         self.classifier = nn.Linear(self.embedding_size, self.hparams.n_classes)
+        self.train_acc = torchmetrics.Accuracy()
 
     def forward(self, x):
         return self.classifier(self.embedding(x))
@@ -280,6 +281,8 @@ class EEGNetv4(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = F.cross_entropy(y_hat, y)
+        self.train_acc(y_hat, y)
+        self.log('train_acc', self.train_acc, on_epoch=True)
         self.log("train_loss", loss, on_epoch=True)
         return loss
 
