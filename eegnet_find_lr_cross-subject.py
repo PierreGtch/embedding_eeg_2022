@@ -58,7 +58,7 @@ labels_ids = torch.tensor(le.fit_transform(labels), dtype=torch.int64)
 
 # Main:
 datamodule = CrossSubjectDataModule(test_subject=TEST_SUBJECT, X=X, labels=labels_ids, metadata=metadata,
-                                    batch_size=config['net_params']['batch_size'])
+                                    dataloader_kwargs=dict(config['dataloader_params'], **local_config['dataloader_params']))
 model = EEGNetv4(**module_params)
 trainer = pl.Trainer(max_epochs=config['net_params']['max_epochs'], devices=devices,
                      accelerator=args.accelerator, enable_checkpointing=False,

@@ -6,4 +6,7 @@ evaluation_params:
     error_score: 'raise'
     suffix: ''
     hdf5_path: null
+dataloader_params:
+  num_workers: 0
+  pin_memory: false
 
