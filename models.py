@@ -250,39 +250,28 @@ class EEGNetv4(pl.LightningModule):
             max_lr=0.1,
     ):
         super().__init__()
-        self.in_chans = in_chans
-        self.n_classes = n_classes
-        self.input_window_samples = input_window_samples
-        self.pool_mode = pool_mode
-        self.F1 = F1
-        self.D = D
-        self.F2 = F2
-        self.kernel_length = kernel_length
-        self.third_kernel_size = third_kernel_size
-        self.drop_prob = drop_prob
-        self.lr = lr
-        self.max_lr = max_lr
+        self.save_hyperparameters()
 
         self.embedding = _EEGNetv4Embedding(
-            in_chans=self.in_chans,
-            pool_mode=self.pool_mode,
-            F1=self.F1,
-            D=self.D,
-            F2=self.F2,
-            kernel_length=self.kernel_length,
-            third_kernel_size=self.third_kernel_size,
-            drop_prob=self.drop_prob,
+            in_chans=self.hparams.in_chans,
+            pool_mode=self.hparams.pool_mode,
+            F1=self.hparams.F1,
+            D=self.hparams.D,
+            F2=self.hparams.F2,
+            kernel_length=self.hparams.kernel_length,
+            third_kernel_size=self.hparams.third_kernel_size,
+            drop_prob=self.hparams.drop_prob,
         )
 
         out = self.embedding(
             torch.ones(
-                (1, self.in_chans, self.input_window_samples, 1),
+                (1, self.hparams.in_chans, self.hparams.input_window_samples, 1),
                 dtype=torch.float32
             )
         )
         self.embedding_size = out.cpu().data.numpy().shape[1]
 
-        self.classifier = nn.Linear(self.embedding_size, self.n_classes)
+        self.classifier = nn.Linear(self.embedding_size, self.hparams.n_classes)
 
     def forward(self, x):
         return self.classifier(self.embedding(x))
@@ -295,10 +284,10 @@ class EEGNetv4(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.hparams.lr)
         lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=self.max_lr,
+            max_lr=self.hparams.max_lr,
             total_steps=self.trainer.estimated_stepping_batches
         )
         return dict(
