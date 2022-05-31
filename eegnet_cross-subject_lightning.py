@@ -22,12 +22,13 @@ moabb.set_log_level("info")
 # Parser
 parser = argparse.ArgumentParser()
 parser.add_argument('--subjects', type=int, nargs='+')
-parser.add_argument('--devices', type=int, default=-1, help='the number of the GPU on which the models must be trained')
-parser.add_argument('--accelerator', type=str, default='gpu')
+parser.add_argument('--devices', type=int, default=None, help='the number of the GPU on which the models must be trained')
+parser.add_argument('--accelerator', type=str, default=None)
 parser.add_argument('--n_jobs', type=int, default=1)
 parser.add_argument('--overwrite_checkpoints', default=False, action='store_true')
 args = parser.parse_args()
-devices = None if (args.accelerator == 'cpu') else args.devices if isinstance(args.devices, list) else [args.devices]
+devices = None if (args.accelerator is None or args.accelerator == 'cpu') else \
+    [args.devices] if isinstance(args.devices, int) else args.devices
 
 # Load condig
 config_file = Path(__file__).parent / 'config.yaml'
@@ -67,6 +68,7 @@ for subject in args.subjects:
         else:
             raise ValueError(f'Checkpoint directory {path} already exists')
     path.mkdir(parents=True)
+    checkpoint_dir_list.append(str(path))
 
 # Get data
 dataset = Schirrmeister2017()
@@ -82,6 +84,7 @@ labels_ids = torch.tensor(le.fit_transform(labels), dtype=torch.int64)
 
 # Define training loop:
 def main(subject, ckpt_path):
+    print(subject, ckpt_path)
     datamodule = CrossSubjectDataModule(test_subject=subject, X=X, labels=labels_ids, metadata=metadata,
                                         batch_size=config['net_params']['batch_size'])
     model = EEGNetv4(**module_params)
@@ -92,7 +95,11 @@ def main(subject, ckpt_path):
     return trainer.test(model, datamodule=datamodule, verbose=True)
 
 
-results = Parallel(n_jobs=args.n_jobs)(
-    delayed(main)(subject, ckpt_path) for subject, ckpt_path in zip(args.subjects, checkpoint_dir_list)
-)
+if args.n_jobs > 1:
+    results = Parallel(n_jobs=args.n_jobs)(
+        delayed(main)(subject, ckpt_path) for subject, ckpt_path in zip(args.subjects, checkpoint_dir_list)
+    )
+else:
+    results = [main(subject, ckpt_path) for subject, ckpt_path in zip(args.subjects, checkpoint_dir_list)]
+
 print(results)
