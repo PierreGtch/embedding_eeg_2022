@@ -273,6 +273,8 @@ class EEGNetv4(pl.LightningModule):
         self.embedding_size = out.cpu().data.numpy().shape[1]
         self.classifier = nn.Linear(self.embedding_size, self.hparams.n_classes)
         self.train_acc = torchmetrics.Accuracy()
+        self.val_acc = torchmetrics.Accuracy()
+        self.test_acc = torchmetrics.Accuracy()
 
     def forward(self, x):
         return self.classifier(self.embedding(x))
@@ -284,6 +286,24 @@ class EEGNetv4(pl.LightningModule):
         self.train_acc(y_hat, y)
         self.log('train_acc', self.train_acc, on_epoch=True)
         self.log("train_loss", loss, on_epoch=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = F.cross_entropy(y_hat, y)
+        self.val_acc(y_hat, y)
+        self.log('val_acc', self.val_acc, on_epoch=True)
+        self.log("val_loss", loss, on_epoch=True)
+        return loss
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = F.cross_entropy(y_hat, y)
+        self.test_acc(y_hat, y)
+        self.log('test_acc', self.test_acc, on_epoch=True)
+        self.log("test_loss", loss, on_epoch=True)
         return loss
 
     def configure_optimizers(self):
