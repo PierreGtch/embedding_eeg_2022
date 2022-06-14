@@ -71,6 +71,10 @@ evaluation_params:
   within_session:
     n_perms: null
     data_size: null
+#    data_size:
+#      policy: per_class
+#      value: [1, 2, 4, 8, 16, 32, 64, 96]
+#    n_perms: [50, 34, 23, 15, 10, 7, 5, 5]  # When the training data is sparse, peform more permutations than when we have a lot of data
 net_params:
   # random_state: 12
   max_epochs: 1500
