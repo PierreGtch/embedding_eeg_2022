@@ -13,7 +13,12 @@ dependencies:
 - h5py
 - tqdm
 - pytorch
+- torchvision
+- torchmetrics
 - skorch
+- umap-learn
+- jupyterlab
 - pip:
   - mne
-  - moabb
+  - git+https://github.com/PierreGtch/moabb.git@prepare_and_save_models#egg=moabb
+  - pytorch-lightning
