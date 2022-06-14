@@ -60,7 +60,7 @@ checkpoints_root_dir = Path(fake_results.filepath).parent
 del fake_results
 checkpoint_dir_list = []
 for subject in args.subjects:
-    path = checkpoints_root_dir / (str(subject) + results_params['suffix'])
+    path = checkpoints_root_dir / str(subject)
     if path.exists():
         if args.overwrite_checkpoints:
             print(f'removing pre-existing checkpoint directory {path}')
