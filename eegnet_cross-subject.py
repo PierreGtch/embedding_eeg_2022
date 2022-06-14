@@ -1,13 +1,8 @@
 from pathlib import Path
 
 import yaml
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 import numpy as np
-import torch
-from skorch.classifier import NeuralNetClassifier
-from skorch.callbacks import Checkpoint, LRScheduler
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import FunctionTransformer
 import moabb
@@ -17,6 +12,7 @@ from moabb.paradigms import MotorImagery
 from moabb.analysis import Results
 
 from models import EEGNetv4
+from skorch_frozen import FrozenNeuralNetClassifier
 
 moabb.set_log_level("info")
 
@@ -33,50 +29,7 @@ channels = config['paradigm_params']['base']['channels']
 resample = config['paradigm_params']['base']['resample']
 t0, t1 = Schirrmeister2017().interval
 
-# Create classifier
-net_params = dict(
-    module__n_classes=n_classes,
-    module__in_chans=len(channels),
-    module__input_window_samples=(t1 - t0) * resample,
-)
-net_params_update = [{k: v} if not isinstance(v, dict) else {f'{k}__{k2}': v2 for k2, v2 in v.items()} for k, v in
-                     config['net_params'].items()]
-net_params_update += [{k: v} if not isinstance(v, dict) else {f'{k}__{k2}': v2 for k2, v2 in v.items()} for k, v in
-                      local_config['net_params'].items()]
-for d in net_params_update:
-    net_params.update(d)
-print('Setting OneCycle scheduler max_lr based on lr param')
-lr_scheduler = LRScheduler(
-    policy=torch.optim.lr_scheduler.OneCycleLR,
-    max_lr=config['net_params']['lr'],
-    step_every='epoch',
-    total_steps=config['net_params']['max_epochs'],
-)
-results_args = ['suffix', 'overwrite', 'hdf5_path', 'additional_columns']
-fake_results = Results(CrossSubjectEvaluation, MotorImagery,
-                       **{k: local_config['evaluation_params']['base'][k] for k in results_args if
-                          k in local_config['evaluation_params']['base']})
-checkpoint = Checkpoint(f_pickle='net.pickle', dirname=Path(fake_results.filepath).parent, monitor=None)
-del fake_results
-callbacks = [
-    ('lr_scheduler', lr_scheduler),
-    ('checkpoint', checkpoint),
-]
-net = NeuralNetClassifier(
-    EEGNetv4,
-    optimizer=torch.optim.AdamW,
-    criterion=torch.nn.CrossEntropyLoss,
-    callbacks=callbacks,
-    **net_params,
-)
-
-pipelines = {}
-pipelines["EEGNet-CrossSubject"] = make_pipeline(
-    FunctionTransformer(func=np.float32, inverse_func=np.float64),
-    net,
-)
-
-# Evaluation
+# Dataset
 dataset = Schirrmeister2017()
 datasets = [dataset]
 
@@ -84,10 +37,40 @@ paradigm = MotorImagery(
     **config['paradigm_params']['base'],
     **config['paradigm_params']['single_band'],
 )
+
+# Prepare checkpoint directories
+results_param_names = ['suffix', 'overwrite', 'hdf5_path', 'additional_columns']
+results_params = {k: local_config['evaluation_params']['base'][k] for k in results_param_names if
+                  k in local_config['evaluation_params']['base']}
+fake_results = Results(CrossSubjectEvaluation, MotorImagery, **results_params)
+checkpoints_root_dir = Path(fake_results.filepath).parent
+del fake_results
+checkpoints_dict = {}
+for subject in dataset.subject_list:
+    path = checkpoints_root_dir / (str(subject) + results_params['suffix'])
+    files = list(path.glob('*.ckpt'))
+    if len(files) != 1:
+        raise ValueError(f'Multiple or no checkpoint file(s) present at {path}')
+    checkpoints_dict[subject] = str(files[0])
+
+# Create pipeline
+pipelines = {}
+pipelines["EEGNet-CrossSubject"] = make_pipeline(
+    FunctionTransformer(func=np.float32, inverse_func=np.float64),
+    FrozenNeuralNetClassifier(EEGNetv4.load_from_checkpoint(str(list(checkpoints_dict.values())[0]))),
+)
+
+
+def pre_fit_function(pipeline, dataset, subject):
+    path = checkpoints_dict[subject]
+    print(f'Loading checkpoint for subject {subject} from {path}')
+    pipeline[1].initialize().module.load_state_dict(EEGNetv4.load_from_checkpoint(path).state_dict())
+
+
+# Evaluation
 evaluation = CrossSubjectEvaluation(
     paradigm=paradigm, datasets=datasets,
-    pre_fit_function=lambda pipeline, dataset, subject: setattr(pipeline[1].callbacks[1][1], 'fn_prefix',
-                                                                f'{dataset.__class__.__name__}_{subject}_{suffix}'),
+    pre_fit_function=pre_fit_function,
     **config['evaluation_params']['base'],
     # **config['evaluation_params']['cross_subject'],
     **local_config['evaluation_params']['base'],
