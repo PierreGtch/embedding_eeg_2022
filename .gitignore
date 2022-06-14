@@ -1,8 +1,13 @@
 # IDE
 .idea
+.DS_Store
 
 # python
 __pycache__
+*.ipynb_checkpoints/
+*.ckpt
+*lightning_logs/
 
 # other
 local_config.yaml
+export/
