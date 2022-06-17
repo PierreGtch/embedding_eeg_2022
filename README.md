@@ -20,12 +20,12 @@ Before running `eegnet_linear_probing.py` and `eegnet_cross-subject.py`, you sho
 
 By default, the configuration file is set so that the FBCSP and EEGNet+LP pipelines are evaluated by 5-folds cross-validation on all the calibration trials available. The results with random permutation cross-validation that use restricted number of calibration trials can be computed by editing the configuration files:
 1. In `config.yaml`, comment the lines: 
-```
+```yaml
 n_perms: null
 data_size: null
 ```
 2. In `config.yaml`, uncomment the lines:
-```
+```yaml
 #    data_size:
 #      policy: per_class
 #      value: [1, 2, 4, 8, 16, 32, 64, 96]
