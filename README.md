@@ -1,7 +1,7 @@
 # Embedding neurophysiological signals
 
-## Dependancies installation
-To install the necessary dependancies, you can simply use `conda`:
+## Dependencies installation
+To install the necessary dependencies, you can simply use `conda`:
 ```
 conda env create -f environment.yml
 ```
