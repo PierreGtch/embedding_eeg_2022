@@ -1,4 +1,5 @@
 # Embedding neurophysiological signals
+This repository contains the codes used to obtain the results in the article *Embedding neurophysiological signals*.
 
 ## Dependencies installation
 To install the necessary dependencies, you can simply use `conda`:
